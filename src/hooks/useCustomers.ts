@@ -1,44 +1,54 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { CustomerSummary } from "../types/customer";
-import { fetchCustomerSummaries } from "../services/customerService";
 
-export const useCustomers = () => {
-	const [data, setData] = useState<CustomerSummary[]>([]);
-	const [loading, setLoading] = useState<boolean>(true);
-	const [error, setError] = useState<string | null>(null);
+type SortOrder = "asc" | "desc" | null;
+
+export const useCustomers = (initialData: CustomerSummary[]) => {
 	const [searchTerm, setSearchTerm] = useState<string>("");
+	const [sortOrder, setSortOrder] = useState<SortOrder>(null);
+	const [currentPage, setCurrentPage] = useState<number>(1);
+	const itemsPerPage = 10;
 
-	useEffect(() => {
-		const loadData = async () => {
-			try {
-				setLoading(true);
-				const consolidatedData = await fetchCustomerSummaries();
-				setData(consolidatedData);
-				setError(null);
-			} catch (err: unknown) {
-				if (err instanceof Error) {
-					setError(err.message);
-				} else {
-					setError("Ocorreu um erro inesperado.");
-				}
-			} finally {
-				setLoading(false);
-			}
-		};
+	const processedData = useMemo(() => {
+		let result = [...initialData];
 
-		loadData();
-	}, []);
+		if (searchTerm) {
+			result = result.filter((customer) => customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
+		}
 
-	const filteredCustomers = useMemo(() => {
-		if (!searchTerm) return data;
-		return data.filter((customer) => customer.name.toLowerCase().includes(searchTerm.toLowerCase()));
-	}, [data, searchTerm]);
+		if (sortOrder === "asc") {
+			result.sort((a, b) => a.totalValue - b.totalValue);
+		} else if (sortOrder === "desc") {
+			result.sort((a, b) => b.totalValue - a.totalValue);
+		}
+
+		return result;
+	}, [initialData, searchTerm, sortOrder]);
+
+	const totalPages = Math.ceil(processedData.length / itemsPerPage);
+
+	const paginatedData = useMemo(() => {
+		const startIndex = (currentPage - 1) * itemsPerPage;
+		return processedData.slice(startIndex, startIndex + itemsPerPage);
+	}, [processedData, currentPage]);
+
+	const toggleSort = () => {
+		setSortOrder((prev) => (prev === "asc" ? "desc" : prev === "desc" ? null : "asc"));
+	};
+	const handleSearchChange = (value: string) => {
+		setSearchTerm(value);
+		setCurrentPage(1);
+	};
 
 	return {
-		customers: filteredCustomers,
-		loading,
-		error,
+		customers: paginatedData,
 		searchTerm,
-		setSearchTerm,
+		setSearchTerm: handleSearchChange,
+		sortOrder,
+		toggleSort,
+		currentPage,
+		setCurrentPage,
+		totalPages,
+		totalItems: processedData.length,
 	};
 };

@@ -1,4 +1,5 @@
-import { ApiUser, ApiCart, CustomerSummary } from "../types/customer";
+import { ApiUser, ApiCart, CustomerSummary, ApiUserSchema, ApiCartSchema } from "../types/customer";
+import { z } from "zod";
 
 export const transformCustomerData = (users: ApiUser[], carts: ApiCart[]): CustomerSummary[] => {
 	return users.map((user) => {
@@ -23,11 +24,14 @@ export const fetchCustomerSummaries = async (): Promise<CustomerSummary[]> => {
 	]);
 
 	if (!usersRes.ok || !cartsRes.ok) {
-		throw new Error("Falha ao obter os dados dos servidores. Tente novamente mais tarde.");
+		throw new Error("Falha ao obter os dados dos servidores.");
 	}
 
-	const usersData = (await usersRes.ok) ? await usersRes.json() : { users: [] };
-	const cartsData = (await cartsRes.ok) ? await cartsRes.json() : { carts: [] };
+	const usersData = await usersRes.json();
+	const cartsData = await cartsRes.json();
 
-	return transformCustomerData(usersData.users, cartsData.carts);
+	const validatedUsers = z.array(ApiUserSchema).parse(usersData.users);
+	const validatedCarts = z.array(ApiCartSchema).parse(cartsData.carts);
+
+	return transformCustomerData(validatedUsers, validatedCarts);
 };
